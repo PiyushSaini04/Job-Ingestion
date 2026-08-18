@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 export interface AppEnv {
   port: number;
   supabaseUrl: string;
