@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.*.local
+node_modules
+dist
+.next
+coverage
+*.log
+package-lock.json
+backend/package-lock.json
+frontend/package-lock.json

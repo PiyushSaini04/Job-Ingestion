@@ -1,0 +1,11 @@
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+process.env.PORT = process.env.PORT || '3001';
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-key';
+process.env.REMOTE_OK_API_URL = process.env.REMOTE_OK_API_URL || 'https://remoteok.com/api';
+process.env.ARBEITNOW_API_URL = process.env.ARBEITNOW_API_URL || 'https://www.arbeitnow.com/api/job-board-api';
+process.env.INGESTION_CRON = process.env.INGESTION_CRON || '0 * * * *';
+process.env.MAX_RETRIES = process.env.MAX_RETRIES || '3';
+process.env.BASE_RETRY_DELAY_MS = process.env.BASE_RETRY_DELAY_MS || '1';
+process.env.MANUAL_INGESTION_COOLDOWN_MS = process.env.MANUAL_INGESTION_COOLDOWN_MS || '300000';
+process.env.FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
