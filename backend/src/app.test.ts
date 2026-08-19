@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = {
+  running: false,
   jobs: [
     {
       id: 'job-1',
@@ -76,7 +77,7 @@ vi.mock('./db/repos', () => ({
 }));
 
 vi.mock('./services/ingestion.service', () => ({
-  getIngestionRuntimeState: vi.fn(() => ({ running: false, lastManualRunAt: 0 })),
+  getIngestionRuntimeState: vi.fn(() => ({ running: state.running, lastManualRunAt: 0 })),
   triggerManualIngestion: vi.fn(async () => {
     if (!state.manualAccepted) {
       return { accepted: false, retryAfterMs: 1200 };
@@ -102,6 +103,7 @@ async function loadApp() {
 
 beforeEach(() => {
   state.manualAccepted = true;
+  state.running = false;
 });
 
 describe('app routes', () => {
@@ -150,5 +152,13 @@ describe('app routes', () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(429);
     expect(second.body.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it('returns conflict when ingestion is already running', async () => {
+    state.running = true;
+    const app = await loadApp();
+    const response = await request(app).post('/api/ingestion/run');
+
+    expect(response.status).toBe(409);
   });
 });

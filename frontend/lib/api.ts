@@ -75,6 +75,18 @@ export interface IngestionRunResponse {
   message: string | null;
 }
 
+export class ApiError extends Error {
+  status: number;
+  retryAfterMs: number | null;
+
+  constructor(message: string, status: number, retryAfterMs: number | null = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 function apiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:3001';
 }
@@ -89,8 +101,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || response.statusText || 'Request failed');
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+        ? payload.error
+        : response.statusText || 'Request failed';
+    const retryAfterMs =
+      payload && typeof payload === 'object' && 'retryAfterMs' in payload && typeof payload.retryAfterMs === 'number'
+        ? payload.retryAfterMs
+        : null;
+    throw new ApiError(message, response.status, retryAfterMs);
   }
 
   return (await response.json()) as T;

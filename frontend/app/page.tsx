@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { BackToTop } from '../components/BackToTop';
 import { FilterPills } from '../components/FilterPills';
 import { JobList } from '../components/JobList';
-import { listJobs, type ApiJob } from '../lib/api';
+import { ApiError, listJobs, runIngestion, type ApiJob } from '../lib/api';
+import { formatCooldownMessage } from '../lib/text';
 
 const categories = ['Engineering', 'DevOps', 'Cloud', 'Data', 'AI / ML', 'Security', 'QA / Testing'];
 const roles = [
@@ -21,6 +22,7 @@ const roles = [
   'Security Engineer',
   'QA Engineer'
 ];
+const PAGE_SIZE = 100;
 
 export default function HomePage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -30,7 +32,9 @@ export default function HomePage() {
   const [paginationTotalPages, setPaginationTotalPages] = useState(1);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshingJobs, setRefreshingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
   const filtersKey = useMemo(
     () => JSON.stringify({ selectedCategories, selectedRoles }),
@@ -45,7 +49,7 @@ export default function HomePage() {
 
       const response = await listJobs({
         page: nextPage,
-        limit: 20,
+        limit: PAGE_SIZE,
         categories: selectedCategories,
         roles: selectedRoles
       });
@@ -58,6 +62,24 @@ export default function HomePage() {
     } finally {
       setLoadingJobs(false);
       setLoadingMore(false);
+    }
+  }
+
+  async function refreshJobs() {
+    try {
+      setRefreshingJobs(true);
+      setRefreshMessage(null);
+      await runIngestion();
+      await fetchJobs(1, true);
+      setRefreshMessage('Jobs refreshed successfully.');
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        setRefreshMessage(formatCooldownMessage(error.retryAfterMs, 'Jobs') ?? error.message);
+      } else {
+        setRefreshMessage(error instanceof Error ? error.message : 'Unable to refresh jobs');
+      }
+    } finally {
+      setRefreshingJobs(false);
     }
   }
 
@@ -89,7 +111,23 @@ export default function HomePage() {
           >
             View status
           </Link>
+          <button
+            type="button"
+            onClick={() => void refreshJobs()}
+            disabled={refreshingJobs || loadingJobs}
+            className="ui-focus inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-hover)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {refreshingJobs ? (
+              <>
+                <span className="spinner mr-2 inline-flex h-4 w-4 rounded-full border-2 border-current border-t-transparent opacity-80" />
+                Refreshing...
+              </>
+            ) : (
+              'Refresh Jobs'
+            )}
+          </button>
         </div>
+        {refreshMessage ? <p className="mt-4 text-sm text-[color:var(--text-secondary)]">{refreshMessage}</p> : null}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -144,42 +182,27 @@ export default function HomePage() {
                 Latest technical listings
               </p>
             </div>
-            <p className="text-sm text-[color:var(--text-secondary)]">{jobs.length} shown</p>
+            
+              {/* <p className="text-sm text-[color:var(--text-secondary)]">{jobs.length} shown</p> */}
+            
+          </div>
+          
+          <div className="jobs-scroll h-[135vh] overflow-y-auto pr-2">
+            {loadingJobs ? (
+              <JobList jobs={[]} loading skeletonCount={5} />
+            ) : jobsError ? (
+              <div className="rounded-[1.35rem] border border-[color:color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[color:color-mix(in_srgb,var(--danger)_8%,transparent)] p-6 text-[color:var(--text-primary)]">
+                {jobsError}
+              </div>
+            ) : isEmpty ? (
+              <div className="rounded-[1.35rem] border border-[color:var(--border)] bg-[color:var(--surface-hover)] p-6 text-[color:var(--text-secondary)]">
+                No jobs match the selected filters.
+              </div>
+            ) : (
+              <JobList jobs={jobs} />
+            )}
           </div>
 
-          {loadingJobs ? (
-            <JobList jobs={[]} loading skeletonCount={5} />
-          ) : jobsError ? (
-            <div className="rounded-[1.35rem] border border-[color:color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[color:color-mix(in_srgb,var(--danger)_8%,transparent)] p-6 text-[color:var(--text-primary)]">
-              {jobsError}
-            </div>
-          ) : isEmpty ? (
-            <div className="rounded-[1.35rem] border border-[color:var(--border)] bg-[color:var(--surface-hover)] p-6 text-[color:var(--text-secondary)]">
-              No jobs match the selected filters.
-            </div>
-          ) : (
-            <JobList jobs={jobs} />
-          )}
-
-          <div className="mt-6 flex items-center justify-center">
-            <button
-              type="button"
-              disabled={!hasMore || loadingMore || loadingJobs}
-              onClick={() => void fetchJobs(page + 1, false)}
-              className="ui-focus inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] px-5 py-3 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:color-mix(in_srgb,var(--accent)_18%,transparent)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loadingMore ? (
-                <>
-                  <span className="spinner inline-flex h-4 w-4 rounded-full border-2 border-current border-t-transparent opacity-80" />
-                  Loading...
-                </>
-              ) : hasMore ? (
-                'Load More'
-              ) : (
-                'No more jobs'
-              )}
-            </button>
-          </div>
         </section>
       </div>
 

@@ -74,6 +74,7 @@ vi.mock('../db/repos', () => ({
       Object.assign(run, patch);
     }
   }),
+  getLatestIngestionRun: vi.fn(async () => (state.runs.length ? state.runs[state.runs.length - 1] : null)),
   insertIngestionError: vi.fn(async (row: any) => {
     state.errors.push(row);
   }),
@@ -268,5 +269,27 @@ describe('ingestion service', () => {
     expect(first.accepted).toBe(true);
     expect(second.accepted).toBe(false);
     expect(second.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it('allows manual ingestion once the persisted cooldown window has passed', async () => {
+    state.runs.push({
+      id: 'run-stale',
+      sourceId: 'remote-ok-id',
+      status: 'SUCCESS',
+      startedAt: new Date(Date.now() - 31 * 60 * 1000).toISOString(),
+      completedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      fetchedCount: 1,
+      insertedCount: 1,
+      updatedCount: 0,
+      failedCount: 0,
+      errorMessage: null
+    });
+    remoteJobs = [techJob({ externalId: 'job-stale' })];
+
+    const { triggerManualIngestion } = await loadService();
+    const result = await triggerManualIngestion();
+
+    expect(result.accepted).toBe(true);
+    expect(result.outcome?.run.status).toBe('SUCCESS');
   });
 });

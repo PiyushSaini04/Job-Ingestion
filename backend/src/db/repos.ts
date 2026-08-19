@@ -232,6 +232,17 @@ export async function listRecentRuns(limit = 20): Promise<IngestionRunRecord[]> 
   return (data as DbRunRow[] | null | undefined)?.map(mapRun) ?? [];
 }
 
+export async function getLatestIngestionRun(): Promise<IngestionRunRecord | null> {
+  const { data, error } = await supabase
+    .from('ingestion_runs')
+    .select('*')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapRun(data as DbRunRow) : null;
+}
+
 export async function createIngestionRun(sourceId: string): Promise<IngestionRunRecord> {
   const payload = {
     source_id: sourceId,

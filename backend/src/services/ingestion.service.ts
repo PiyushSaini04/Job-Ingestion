@@ -1,5 +1,5 @@
 import { getEnv } from '../config/env';
-import { createIngestionRun, getSourceByName, insertIngestionError, updateIngestionRun } from '../db/repos';
+import { createIngestionRun, getLatestIngestionRun, getSourceByName, insertIngestionError, updateIngestionRun } from '../db/repos';
 import { classifyJob } from '../utils/classifier';
 import { validateNormalizedJob } from '../utils/validate-job';
 import { withRetry, RetryableHttpError } from '../utils/retry';
@@ -18,10 +18,9 @@ export interface IngestionOutcome {
   skipped: boolean;
 }
 
-const primarySourceName: SourceName = 'Remote OK';
-const fallbackSourceName: SourceName = 'Arbeitnow';
+const remoteOkSourceName: SourceName = 'Remote OK';
+const arbeitnowSourceName: SourceName = 'Arbeitnow';
 
-let manualIngestionStartedAt = 0;
 let currentRun: Promise<IngestionOutcome> | null = null;
 
 function nowIso(): string {
@@ -33,10 +32,10 @@ async function processFetchedJobs(runId: string, source: SourceRecord, rawJobs: 
   const technicalJobs: ClassifiedJob[] = [];
 
   for (const rawJob of rawJobs) {
-     const normalizedJob = {
-        ...rawJob,
-        description: normalizeDescription(rawJob.description),
-      };
+    const normalizedJob = {
+      ...rawJob,
+      description: normalizeDescription(rawJob.description)
+    };
     const validation = validateNormalizedJob(rawJob);
     if (!validation.valid) {
       failed += 1;
@@ -115,117 +114,158 @@ async function runSingleSource(
 }
 
 async function runIngestionInternal(): Promise<IngestionOutcome> {
-  const primarySource = await getSourceByName(primarySourceName);
-  if (!primarySource) {
-    throw new Error('Primary source is missing from the database');
+  const remoteOkSource = await getSourceByName(remoteOkSourceName);
+  const arbeitnowSource = await getSourceByName(arbeitnowSourceName);
+
+  if (!remoteOkSource) {
+    throw new Error('Remote OK source is missing from the database');
   }
 
-  const run = await createIngestionRun(primarySource.id);
-  let fallbackUsed = false;
-  let lastMessage: string | null = null;
+  if (!arbeitnowSource) {
+    throw new Error('Arbeitnow source is missing from the database');
+  }
 
+  const run = await createIngestionRun(remoteOkSource.id);
+
+  let remoteOkResult: Awaited<ReturnType<typeof processFetchedJobs>> | null = null;
+  let arbeitnowResult: Awaited<ReturnType<typeof processFetchedJobs>> | null = null;
+
+  let remoteOkError: string | null = null;
+  let arbeitnowError: string | null = null;
+
+  // --------------------------------------------------
+  // 1. Fetch Remote OK
+  // --------------------------------------------------
   try {
-    const primary = await runSingleSource(run.id, primarySourceName, fetchPrimaryJobs);
-    await updateIngestionRun(run.id, {
-      sourceId: primary.source.id
-    });
+    const remoteOk = await runSingleSource(
+      run.id,
+      remoteOkSourceName,
+      fetchPrimaryJobs
+    );
 
-    const status = primary.result.failed > 0 ? 'PARTIAL' : 'SUCCESS';
-    await updateIngestionRun(run.id, {
+    remoteOkResult = remoteOk.result;
+  } catch (error) {
+    remoteOkError =
+      error instanceof Error ? error.message : 'Remote OK failed';
+  }
+
+  // --------------------------------------------------
+  // 2. Fetch Arbeitnow
+  // ALWAYS runs, even if Remote OK succeeds
+  // --------------------------------------------------
+  try {
+    const arbeitnow = await runSingleSource(
+      run.id,
+      arbeitnowSourceName,
+      fetchFallbackJobs
+    );
+
+    arbeitnowResult = arbeitnow.result;
+  } catch (error) {
+    arbeitnowError =
+      error instanceof Error ? error.message : 'Arbeitnow failed';
+  }
+
+  // --------------------------------------------------
+  // 3. Calculate combined results
+  // --------------------------------------------------
+
+  const fetchedCount =
+    (remoteOkResult?.fetched ?? 0) +
+    (arbeitnowResult?.fetched ?? 0);
+
+  const insertedCount =
+    (remoteOkResult?.inserted ?? 0) +
+    (arbeitnowResult?.inserted ?? 0);
+
+  const updatedCount =
+    (remoteOkResult?.updated ?? 0) +
+    (arbeitnowResult?.updated ?? 0);
+
+  const failedCount =
+    (remoteOkResult?.failed ?? 0) +
+    (arbeitnowResult?.failed ?? 0);
+
+  const remoteOkSucceeded = remoteOkResult !== null;
+  const arbeitnowSucceeded = arbeitnowResult !== null;
+
+  // --------------------------------------------------
+  // 4. Determine overall status
+  // --------------------------------------------------
+
+  let status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
+
+  if (remoteOkSucceeded && arbeitnowSucceeded) {
+    status = failedCount > 0 ? 'PARTIAL' : 'SUCCESS';
+  } else if (remoteOkSucceeded || arbeitnowSucceeded) {
+    status = 'PARTIAL';
+  } else {
+    status = 'FAILED';
+  }
+
+  // --------------------------------------------------
+  // 5. Build error/message information
+  // --------------------------------------------------
+
+  const errors = [
+    remoteOkError ? `Remote OK: ${remoteOkError}` : null,
+    arbeitnowError ? `Arbeitnow: ${arbeitnowError}` : null,
+    remoteOkResult?.message,
+    arbeitnowResult?.message,
+  ].filter(Boolean);
+
+  const errorMessage = errors.length > 0
+    ? errors.join('; ')
+    : null;
+
+  // --------------------------------------------------
+  // 6. Update ingestion run
+  // --------------------------------------------------
+
+  await updateIngestionRun(run.id, {
+    status,
+    completedAt: nowIso(),
+    fetchedCount,
+    insertedCount,
+    updatedCount,
+    failedCount,
+    errorMessage,
+  });
+
+  // --------------------------------------------------
+  // 7. Return combined outcome
+  // --------------------------------------------------
+
+  return {
+    run: {
+      ...run,
       status,
       completedAt: nowIso(),
-      fetchedCount: primary.result.fetched,
-      insertedCount: primary.result.inserted,
-      updatedCount: primary.result.updated,
-      failedCount: primary.result.failed,
-      errorMessage: primary.result.message
-    });
+      fetchedCount,
+      insertedCount,
+      updatedCount,
+      failedCount,
+      errorMessage,
+    } as IngestionRunRecord,
 
-    return {
-      run: { ...run, sourceId: primary.source.id, status, completedAt: nowIso() } as IngestionRunRecord,
-      source: primary.source,
-      fallbackUsed: false,
-      message: primary.result.message,
-      skipped: false
-    };
-  } catch (primaryError) {
-    const fallbackSource = await getSourceByName(fallbackSourceName);
-    if (!fallbackSource) {
-      const message = primaryError instanceof Error ? primaryError.message : 'Primary source failed';
-      await updateIngestionRun(run.id, {
-        status: 'FAILED',
-        completedAt: nowIso(),
-        errorMessage: message
-      });
-      return {
-        run: { ...run, sourceId: primarySource.id, status: 'FAILED', completedAt: nowIso(), errorMessage: message } as IngestionRunRecord,
-        source: primarySource,
-        fallbackUsed: false,
-        message,
-        skipped: false
-      };
-    }
+    // Keep Remote OK as the primary/source shown for the run.
+    source: remoteOkSource,
 
-    fallbackUsed = true;
-    lastMessage = primaryError instanceof Error ? primaryError.message : 'Primary source failed';
+    // This is no longer really "fallback" behavior.
+    fallbackUsed: false,
 
-    try {
-      const fallback = await runSingleSource(run.id, fallbackSourceName, fetchFallbackJobs);
-      await updateIngestionRun(run.id, {
-        sourceId: fallback.source.id
-      });
+    message: errorMessage,
 
-      const status = fallback.result.failed > 0 ? 'PARTIAL' : 'PARTIAL';
-      await updateIngestionRun(run.id, {
-        status,
-        completedAt: nowIso(),
-        fetchedCount: fallback.result.fetched,
-        insertedCount: fallback.result.inserted,
-        updatedCount: fallback.result.updated,
-        failedCount: fallback.result.failed,
-        errorMessage: `${lastMessage}; fallback to Arbeitnow used`
-      });
-
-      return {
-        run: {
-          ...run,
-          sourceId: fallback.source.id,
-          status,
-          completedAt: nowIso(),
-          errorMessage: `${lastMessage}; fallback to Arbeitnow used`
-        } as IngestionRunRecord,
-        source: fallback.source,
-        fallbackUsed: true,
-        message: `${lastMessage}; fallback to Arbeitnow used`,
-        skipped: false
-      };
-    } catch (fallbackError) {
-      const message = fallbackError instanceof Error ? fallbackError.message : 'Fallback source failed';
-      await updateIngestionRun(run.id, {
-        status: 'FAILED',
-        completedAt: nowIso(),
-        errorMessage: `${lastMessage}; ${message}`
-      });
-      return {
-        run: {
-          ...run,
-          sourceId: primarySource.id,
-          status: 'FAILED',
-          completedAt: nowIso(),
-          errorMessage: `${lastMessage}; ${message}`
-        } as IngestionRunRecord,
-        source: primarySource,
-        fallbackUsed: true,
-        message: `${lastMessage}; ${message}`,
-        skipped: false
-      };
-    }
-  }
+    skipped: false,
+  };
 }
 
-function isCooldownActive(now = Date.now()): boolean {
+function getCooldownRemainingMs(latestRunStartedAt: string | null | undefined, now = Date.now()): number {
+  if (!latestRunStartedAt) return 0;
   const env = getEnv();
-  return now - manualIngestionStartedAt < env.manualIngestionCooldownMs;
+  const startedAtMs = new Date(latestRunStartedAt).getTime();
+  if (Number.isNaN(startedAtMs)) return 0;
+  return Math.max(0, env.manualIngestionCooldownMs - (now - startedAtMs));
 }
 
 export async function runIngestion(): Promise<IngestionOutcome> {
@@ -241,16 +281,16 @@ export async function runIngestion(): Promise<IngestionOutcome> {
 }
 
 export async function triggerManualIngestion(): Promise<{ accepted: boolean; retryAfterMs?: number; outcome?: IngestionOutcome }> {
-  const now = Date.now();
-  const env = getEnv();
-  if (isCooldownActive(now)) {
+  const latestRun = await getLatestIngestionRun();
+  const retryAfterMs = getCooldownRemainingMs(latestRun?.startedAt ?? null);
+
+  if (retryAfterMs > 0) {
     return {
       accepted: false,
-      retryAfterMs: Math.max(0, env.manualIngestionCooldownMs - (now - manualIngestionStartedAt))
+      retryAfterMs
     };
   }
 
-  manualIngestionStartedAt = now;
   return {
     accepted: true,
     outcome: await runIngestion()
@@ -260,6 +300,6 @@ export async function triggerManualIngestion(): Promise<{ accepted: boolean; ret
 export function getIngestionRuntimeState(): { running: boolean; lastManualRunAt: number } {
   return {
     running: Boolean(currentRun),
-    lastManualRunAt: manualIngestionStartedAt
+    lastManualRunAt: 0
   };
 }

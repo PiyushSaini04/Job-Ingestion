@@ -216,3 +216,27 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+
+.jobs-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.jobs-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.jobs-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+.jobs-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Firefox */
+.jobs-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}

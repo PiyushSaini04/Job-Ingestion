@@ -1,5 +1,5 @@
 import { IngestionRunRecord } from '../lib/api';
-import { formatDate } from '../lib/text';
+import { formatDateTime } from '../lib/text';
 
 interface Props {
   runs: IngestionRunRecord[];
@@ -41,7 +41,7 @@ export function IngestionHistory({ runs }: Props) {
               <thead className="bg-[color:var(--surface-hover)] text-left text-xs uppercase tracking-[0.28em] text-[color:var(--text-secondary)]">
                 <tr>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Started</th>
+                  <th className="px-4 py-3">Executed</th>
                   <th className="px-4 py-3">Completed</th>
                   <th className="px-4 py-3">Fetched</th>
                   <th className="px-4 py-3">Inserted</th>
@@ -53,9 +53,9 @@ export function IngestionHistory({ runs }: Props) {
                 {runs.map((run) => (
                   <tr key={run.id}>
                     <td className={`px-4 py-4 text-sm font-semibold ${statusTone(run.status)}`}>{run.status}</td>
-                    <td className="px-4 py-4 text-sm text-[color:var(--text-primary)]">{formatDate(run.startedAt)}</td>
+                    <td className="px-4 py-4 text-sm text-[color:var(--text-primary)]">{formatDateTime(run.startedAt)}</td>
                     <td className="px-4 py-4 text-sm text-[color:var(--text-secondary)]">
-                      {run.completedAt ? formatDate(run.completedAt) : 'Running'}
+                      {run.completedAt ? formatDateTime(run.completedAt) : 'Running'}
                     </td>
                     <td className="px-4 py-4 text-sm text-[color:var(--text-primary)]">{run.fetchedCount}</td>
                     <td className="px-4 py-4 text-sm text-[color:var(--text-primary)]">{run.insertedCount}</td>
@@ -73,10 +73,10 @@ export function IngestionHistory({ runs }: Props) {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className={`text-sm font-semibold ${statusTone(run.status)}`}>{run.status}</p>
-                    <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{formatDate(run.startedAt)}</p>
+                    <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{formatDateTime(run.startedAt)}</p>
                   </div>
                   <p className="text-xs text-[color:var(--text-secondary)]">
-                    {run.completedAt ? formatDate(run.completedAt) : 'Running'}
+                    {run.completedAt ? formatDateTime(run.completedAt) : 'Running'}
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

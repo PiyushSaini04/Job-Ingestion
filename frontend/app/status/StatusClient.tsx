@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { IngestionHistory } from '../../components/IngestionHistory';
 import { IngestionStatus } from '../../components/IngestionStatus';
 import { SourceStatus } from '../../components/SourceStatus';
-import { getIngestionRuns, getSources, runIngestion, type IngestionRunRecord, type SourceStatusRecord } from '../../lib/api';
+import { ApiError, getIngestionRuns, getSources, runIngestion, type IngestionRunRecord, type SourceStatusRecord } from '../../lib/api';
+import { formatCooldownMessage } from '../../lib/text';
 
 export function StatusClient() {
   const [sources, setSources] = useState<SourceStatusRecord[]>([]);
@@ -45,7 +46,11 @@ export function StatusClient() {
       );
       await refresh();
     } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : 'Unable to run ingestion');
+      if (err instanceof ApiError && err.status === 429) {
+        setStatusMessage(formatCooldownMessage(err.retryAfterMs, 'Jobs') ?? err.message);
+      } else {
+        setStatusMessage(err instanceof Error ? err.message : 'Unable to run ingestion');
+      }
     } finally {
       setRunningIngestion(false);
     }
