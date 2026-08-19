@@ -1,13 +1,11 @@
-# Decisions
+## 1. Why this ingestion strategy over the obvious alternative I rejected?
 
-## 1. Why this ingestion strategy
+I chose a public-API ingestion path instead of browser automation against a protected job board. That keeps the demo safe, reproducible, and honest: the important parts of the system are retry, fallback, validation, deduplication, and source health, not bypassing access controls. Remote OK is the primary source and Arbeitnow is the fallback so the same ingestion pipeline can still demonstrate real resilience.
 
-I used permitted public job APIs instead of scraping protected platforms. That keeps the implementation aligned with the assessment's low-risk approach, avoids bypass behavior, and still demonstrates the engineering goals: retry, backoff, fallback, deduplication, and data preservation.
+## 2. One trade-off I made under the time limit, and what I would do with a real week
 
-## 2. What was left out
+The main trade-off was keeping the source set small and the filtering deterministic instead of adding more adapters, richer taxonomy mapping, or a broader UI. With a full week, I would add a second verified public source, more ingestion coverage around edge cases, and more route-level tests for failure modes that are only lightly exercised here.
 
-I intentionally left out auth, saved jobs, search, queues, AI-based classification, notifications, analytics stacks, container orchestration, and any browser automation or anti-bot evasion. Those additions would add complexity without improving the core ingestion demonstration.
+## 3. Where I used AI tools, and what I personally verified or changed afterward
 
-## 3. AI assistance and verification
-
-AI assistance was used to draft and assemble the repository, including the initial code, tests, and documentation. I verified the result by running the backend test suite and a full workspace build locally, then corrected the implementation where the compiler or tests exposed mismatches. No deployment claims are being made here.
+I used AI help to speed up scaffolding and initial refactors, then I checked the actual code paths myself. I verified the backend routes, the retry and fallback flow, the database upsert behavior, the frontend contract, and the documentation so they match the running app rather than the original draft notes.

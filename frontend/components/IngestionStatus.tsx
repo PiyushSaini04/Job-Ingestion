@@ -11,44 +11,45 @@ export function IngestionStatus({ runs, loading, onRun, statusMessage }: Props) 
   const latest = runs[0];
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/6 p-5 shadow-glow backdrop-blur-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="ui-card rounded-[1.75rem] p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-400">Ingestion</h2>
-          <p className="mt-1 text-2xl font-semibold text-white">Run ingestion now</p>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.32em] text-[color:var(--text-secondary)]">Ingestion</h2>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--text-primary)]">Run ingestion now</p>
+          <p className="mt-2 max-w-xl text-sm text-[color:var(--text-secondary)]">
+            Trigger the backend ingestion flow, including retry, fallback, and deduplication.
+          </p>
         </div>
         <button
           type="button"
           onClick={onRun}
           disabled={loading}
-          className="rounded-full bg-amber-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="ui-focus inline-flex items-center gap-2 rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Running...' : 'Run Ingestion'}
+          {loading ? (
+            <>
+              <span className="spinner inline-flex h-4 w-4 rounded-full border-2 border-current border-t-transparent opacity-80" />
+              Running ingestion...
+            </>
+          ) : (
+            'Run Ingestion'
+          )}
         </button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-200">
+      <div className="status-pop mt-5 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-hover)] p-4 text-sm text-[color:var(--text-primary)]">
         <p>{statusMessage || 'Ready to run. The backend handles retry, fallback, and deduplication.'}</p>
         {latest ? (
-          <p className="mt-2 text-slate-400">
+          <p className="mt-2 text-[color:var(--text-secondary)]">
             Latest run: {latest.status} • fetched {latest.fetchedCount} • inserted {latest.insertedCount} • updated {latest.updatedCount} • failed {latest.failedCount}
           </p>
         ) : null}
       </div>
 
-      <div className="mt-4 space-y-2">
-        {runs.slice(0, 5).map((run) => (
-          <div key={run.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm">
-            <div>
-              <p className="font-medium text-white">{run.status}</p>
-              <p className="text-slate-400">{new Date(run.startedAt).toLocaleString()}</p>
-            </div>
-            <div className="text-right text-slate-300">
-              <p>{run.fetchedCount} fetched</p>
-              <p>{run.failedCount} failed</p>
-            </div>
-          </div>
-        ))}
+      <div className="mt-5 flex flex-wrap gap-3 text-xs text-[color:var(--text-secondary)]">
+        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1.5">Healthy: pulsing dot</span>
+        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1.5">Degraded: static warning dot</span>
+        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1.5">Fallback: truthful message only</span>
       </div>
     </section>
   );

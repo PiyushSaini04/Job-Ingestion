@@ -11,11 +11,11 @@ export function FilterPills({ label, items, selected, onChange }: Props) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{label}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.32em] text-[color:var(--text-secondary)]">{label}</h2>
         <button
           type="button"
           onClick={() => onChange([])}
-          className="text-xs text-sky-300 transition hover:text-sky-200"
+          className="text-xs text-[color:var(--accent)] transition hover:text-[color:var(--accent-hover)]"
         >
           Clear
         </button>
@@ -29,10 +29,10 @@ export function FilterPills({ label, items, selected, onChange }: Props) {
               type="button"
               onClick={() => onChange(active ? selected.filter((value) => value !== item) : [...selected, item])}
               className={[
-                'rounded-full border px-4 py-2 text-sm transition',
+                'ui-chip rounded-full border px-4 py-2 text-sm font-medium',
                 active
-                  ? 'border-sky-300 bg-sky-300/20 text-sky-50 shadow-glow'
-                  : 'border-white/10 bg-white/5 text-slate-200 hover:border-sky-300/50 hover:bg-sky-300/10'
+                  ? 'border-[color:color-mix(in_srgb,var(--accent)_42%,var(--border))] bg-[color:color-mix(in_srgb,var(--accent)_18%,transparent)] text-[color:var(--text-primary)] ring-1 ring-[color:color-mix(in_srgb,var(--accent)_18%,transparent)]'
+                  : 'border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] hover:border-[color:color-mix(in_srgb,var(--accent)_34%,var(--border))] hover:text-[color:var(--text-primary)]'
               ].join(' ')}
             >
               {item}

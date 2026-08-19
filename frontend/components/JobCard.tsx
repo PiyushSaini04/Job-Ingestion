@@ -4,37 +4,49 @@ import { compactLocation, formatDate } from '../lib/text';
 
 interface Props {
   job: ApiJob;
+  index?: number;
 }
 
-export function JobCard({ job }: Props) {
+export function JobCard({ job, index = 0 }: Props) {
   return (
-    <article className="rounded-3xl border border-white/10 bg-white/6 p-5 shadow-glow backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-sky-300/30 hover:bg-white/8">
+    <article
+      className="card-enter ui-card ui-card-hover rounded-[1.75rem] p-5 sm:p-6"
+      style={{ animationDelay: `${Math.min(index, 12) * 60}ms` }}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.25em] text-slate-400">
-            <span>{job.source}</span>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-[color:var(--text-secondary)]">
+            <span className="rounded-full border border-[color:var(--border)] bg-[color:color-mix(in_srgb,var(--accent)_10%,transparent)] px-2.5 py-1 text-[color:var(--accent)]">
+              {job.source}
+            </span>
             <span>•</span>
             <span>{job.category}</span>
             <span>•</span>
             <span>{job.role}</span>
           </div>
-          <h3 className="text-xl font-semibold text-white sm:text-2xl">
-            <Link href={`/jobs/${job.id}`} className="hover:text-sky-300">
+          <h3 className="max-w-3xl text-xl font-semibold tracking-tight text-[color:var(--text-primary)] sm:text-2xl">
+            <Link href={`/jobs/${job.id}`} className="transition hover:text-[color:var(--accent)]">
               {job.title}
             </Link>
           </h3>
-          <p className="text-sm text-slate-300">{job.company}</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">{job.company}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-right text-xs text-slate-300">
-          <div>{formatDate(job.publishedAt)}</div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-hover)] px-4 py-3 text-right text-xs text-[color:var(--text-secondary)]">
+          <div className="text-[color:var(--text-primary)]">{formatDate(job.publishedAt)}</div>
           <div className="mt-1">{job.remote ? 'Remote' : 'On-site'}</div>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2 text-sm text-slate-200">
-        <span className="rounded-full bg-white/5 px-3 py-1">{compactLocation(job.location)}</span>
-        <span className="rounded-full bg-white/5 px-3 py-1">{job.jobType || 'Not provided'}</span>
-        <span className="rounded-full bg-white/5 px-3 py-1">{job.remote ? 'Remote' : 'On-site'}</span>
+      <div className="mt-5 flex flex-wrap gap-2 text-sm text-[color:var(--text-primary)]">
+        <span className="ui-chip rounded-full border border-[color:var(--border)] bg-[color:var(--surface-hover)] px-3 py-1.5">
+          {compactLocation(job.location)}
+        </span>
+        <span className="ui-chip rounded-full border border-[color:var(--border)] bg-[color:var(--surface-hover)] px-3 py-1.5">
+          {job.jobType || 'Not provided'}
+        </span>
+        <span className="ui-chip rounded-full border border-[color:var(--border)] bg-[color:var(--surface-hover)] px-3 py-1.5">
+          {job.remote ? 'Remote' : 'On-site'}
+        </span>
       </div>
     </article>
   );

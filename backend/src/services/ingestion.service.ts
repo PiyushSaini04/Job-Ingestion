@@ -7,6 +7,7 @@ import { fetchRemoteOkJobs } from '../sources/remoteok';
 import { fetchArbeitnowJobs } from '../sources/arbeitnow';
 import { persistTechnicalJobs } from './job.service';
 import { recordSourceFailure, recordSourceSuccess } from './source-health.service';
+import { normalizeDescription } from '../utils/normalize-description';
 import type { ClassifiedJob, IngestionRunRecord, SourceRecord, SourceName } from '../types/job';
 
 export interface IngestionOutcome {
@@ -32,6 +33,10 @@ async function processFetchedJobs(runId: string, source: SourceRecord, rawJobs: 
   const technicalJobs: ClassifiedJob[] = [];
 
   for (const rawJob of rawJobs) {
+     const normalizedJob = {
+        ...rawJob,
+        description: normalizeDescription(rawJob.description),
+      };
     const validation = validateNormalizedJob(rawJob);
     if (!validation.valid) {
       failed += 1;
